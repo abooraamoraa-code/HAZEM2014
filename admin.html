@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الإدارة الآمنة والمشفرة</title>
+    <style>
+        body { background: #030712; color: #f3f4f6; font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 0; }
+        #lockScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 999; }
+        .lock-box { background: #1e293b; padding: 35px; border-radius: 12px; width: 350px; text-align: center; border: 1px solid #334155; box-sizing: border-box; }
+        .lock-box input { width: 100%; padding: 12px; margin: 15px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; text-align: center; font-size: 16px; box-sizing: border-box; }
+        .lock-box button { width: 100%; background: #ef4444; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        #adminContent { display: none; padding: 30px; max-width: 1200px; margin: 0 auto; box-sizing: border-box; }
+        h1 { color: #60a5fa; font-size: 22px; }
+        .panel-section { background: #1e293b; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #334155; font-size: 14px; }
+        th { color: #94a3b8; }
+        .refresh-btn { background: #3b82f6; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="lockScreen">
+        <div class="lock-box">
+            <span style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;">منطقة مشفرة 🔒</span>
+            <h3 style="color: white; margin-top: 15px;">أدخل كلمة مرور المشرف</h3>
+            <input type="password" id="passInput" placeholder="كلمة المرور">
+            <button onclick="checkPass()">دخول اللوحة 🛡️</button>
+            <p id="errMsg" style="color: #f87171; font-size: 13px; margin-top: 10px;"></p>
+        </div>
+    </div>
+
+    <div id="adminContent">
+        <header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 25px;">
+            <h1>🛠️ لوحة تحكم المشرف (الطلبات والتحميلات)</h1>
+            <button class="refresh-btn" onclick="loadAdminData()">تحديث البيانات سحابياً 🔄</button>
+        </header>
+
+        <div class="panel-section">
+            <h3 style="margin-top: 0; color: #34d399;">📥 طلبات المواقع والمواصفات الخاصة (التسليم عبر فيسبوك)</h3>
+            <div id="customOrdersTable">جاري جلب الطلبات...</div>
+        </div>
+
+        <div class="panel-section">
+            <h3 style="margin-top: 0; color: #60a5fa;">📊 سجل تحميلات القوالب المجانية</h3>
+            <div id="downloadsTable">جاري جلب السجلات...</div>
+        </div>
+    </div>
+
+    <script>
+        // كلمة المرور المشفرة (كلمة المرور الحقيقية هي: admin2026_secure)
+        const SECURE_HASH = "YWRtaW4yMDI2X3NlY3VyZQ==";
+
+        function checkPass() {
+            const val = document.getElementById('passInput').value.trim();
+            if(btoa(val) === SECURE_HASH) {
+                document.getElementById('lockScreen').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+                loadAdminData();
+            } else {
+                document.getElementById('errMsg').innerText = "كلمة المرور غير صحيحة!";
+                document.getElementById('passInput').value = "";
+            }
+        }
+    </script>
+
+    <script type="module">
+        import { db } from './firebase-config.js';
+        import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+        window.loadAdminData = async function() {
+            const customDiv = document.getElementById('customOrdersTable');
+            customDiv.innerHTML = "جاري التحميل...";
+            try {
+                const querySnap = await getDocs(collection(db, "custom_orders"));
+                if(querySnap.empty) {
+                    customDiv.innerHTML = "<p style='color:#94a3b8;'>لا توجد طلبات جديدة حتى الآن.</p>";
+                } else {
+                    let html = "<table><tr><th>البريد الإلكتروني</th><th>رابط الفيسبوك للتسليم</th><th>المواصفات المطلوبة</th><th>الحالة</th></tr>";
+                    querySnap.forEach(doc => {
+                        let data = doc.data();
+                        html += `<tr>
+                            <td style="color:#60a5fa;">${data.userEmail}</td>
+                            <td><a href="${data.facebookLink}" target="_blank" style="color:#34d399;">رابط البروفايل 🔗</a></td>
+                            <td>${data.specifications}</td>
+                            <td style="color:#f59e0b; font-weight:bold;">${data.status}</td>
+                        </tr>`;
+                    });
+                    html += "</table>";
+                    customDiv.innerHTML = html;
+                }
+            } catch(e) {
+                customDiv.innerHTML = "خطأ في الاتصال: " + e.message;
+            }
+
+            const downDiv = document.getElementById('downloadsTable');
+            try {
+                const downSnap = await getDocs(collection(db, "downloads"));
+                if(downSnap.empty) {
+                    downDiv.innerHTML = "<p style='color:#94a3b8;'>لا توجد تحميلات مسجلة.</p>";
+                } else {
+                    let html2 = "<table><tr><th>المستخدم</th><th>القالب الذي تم تحميله</th><th>نوع الطلب</th></tr>";
+                    downSnap.forEach(doc => {
+                        let data = doc.data();
+                        html2 += `<tr><td>${data.user}</td><td>${data.item}</td><td>${data.type}</td></tr>`;
+                    });
+                    html2 += "</table>";
+                    downDiv.innerHTML = html2;
+                }
+            } catch(e) {
+                downDiv.innerHTML = "خطأ في التحميل: " + e.message;
+            }
+        }
+    </script>
+</body>
+</html>
